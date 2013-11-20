@@ -17,7 +17,13 @@ from . import _tree
 
 
 def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
-                    max_depth=None, close=None):
+                    max_depth=None, close=None,
+                    inner_node_labels="%s <= %.4f\\n%s = %s\\nsamples = %s",
+                    inner_node_label_params=['split_feature', 'split_threshold','criterion', 'criterion_value', 'n_samples'],
+                    leaf_node_labels="%s = %.4f\\nsamples = %s\\nvalue = %s",
+                    leaf_node_label_params=['criterion', 'criterion_value', 'n_samples', 'counts']
+                    ):
+
     """Export a decision tree in DOT format.
 
     This function generates a GraphViz representation of the decision tree,
@@ -66,25 +72,23 @@ def export_graphviz(decision_tree, out_file="tree.dot", feature_names=None,
         if tree.n_outputs == 1:
             value = value[0, :]
 
-        if tree.children_left[node_id] == _tree.TREE_LEAF:
-            return "%s = %.4f\\nsamples = %s\\nvalue = %s" \
-                   % (criterion,
-                      tree.impurity[node_id],
-                      tree.n_node_samples[node_id],
-                      value)
+        if feature_names is not None:
+            feature = feature_names[tree.feature[node_id]]
         else:
-            if feature_names is not None:
-                feature = feature_names[tree.feature[node_id]]
-            else:
-                feature = "X[%s]" % tree.feature[node_id]
+            feature = "X[%s]" % tree.feature[node_id]
 
-            return "%s <= %.4f\\n%s = %s\\nsamples = %s" \
-                   % (feature,
-                      tree.threshold[node_id],
-                      criterion,
-                      tree.impurity[node_id],
-                      tree.n_node_samples[node_id])
+        label_parameter_map = {'split_feature': feature,
+                               'split_threshold': tree.threshold[node_id],
+                               'criterion': criterion,
+                               'criterion_value': tree.impurity[node_id],
+                               'n_samples': tree.n_node_samples[node_id],
+                               'counts': value,
+                               'ratios': ['%.2f' % (float(v)/tree.n_node_samples[node_id]) for v in value]}
 
+        if tree.children_left[node_id] == _tree.TREE_LEAF:
+            return leaf_node_labels % tuple([label_parameter_map[param] for param in leaf_node_label_params])
+        else:
+            return inner_node_labels % tuple([label_parameter_map[param] for param in inner_node_label_params])
 
     def recurse(tree, node_id, criterion, parent=None, depth=0):
         if node_id == _tree.TREE_LEAF:
